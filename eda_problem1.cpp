@@ -8,10 +8,12 @@
 #include<fstream>
 #include<sstream>
 #include<algorithm>
+#include<cmath>
 using namespace std;
 
 
 int gate_num=0;
+
 //定义门的类型；
 enum TYPE
 {
@@ -22,96 +24,55 @@ enum TYPE
     and2
 };
 
-
+//存储端口名称，包括结点名和端口名
 struct port_name
 {
     int node;
     int port;
 };
+
+
 //超边
 struct h_edge
 {
     string name;
     vector<int> fro;
     vector<int> to;
-    vector<port_name> in_ports;
+    vector<port_name> to_ports;
 };
-
-
-//边
-struct edge
-{
-    string name;
-    int fro;
-    int to;
-    port_name in_ports;
-};
-
 
 //超边集合和边集合
 unordered_map<string,h_edge> HE;
-vector<edge> E;
+
 
 
 struct Node
 {
     string name;
     TYPE gate_type;
-    vector<edge> e;
+    vector<h_edge> e;
     int scc;//所属scc序号
 };
 
 vector<Node> G;
 
-//将超边转换成边，并且添加到G中
-void he_to_e(unordered_map<string,h_edge> HE1, vector<edge> &E1)
+
+struct e_in_scc
 {
-    for(auto &pair:HE1)
-    {
-        h_edge &he1=pair.second;
-        
-        if(he1.fro.empty()==1)//该信号线为输入信号
-        {
-            //添加输入节点
-            Node node1;
-            node1.name=he1.name;
-            node1.gate_type=inp;
-            G.push_back(node1);
-
-            
-            he1.fro.push_back(gate_num);
-            gate_num++;
-            
-        }
-
-        for(int i=0;i<he1.to.size();i++)
-        {
-            edge e1;
-            e1.name=he1.name;
-            e1.fro=he1.fro[0];
-            e1.to=he1.to[i];
-            e1.in_ports=he1.in_ports[i];
-
-            E1.push_back(e1);
-            G[he1.fro[0]].e.push_back(e1);
-        }
-    }
-}
+    h_edge edge;
+    port_name port;
+};
 
 
 struct scc_node
 {
     vector<int> node;
-    vector<edge> e_in;
-    vector<edge> e_out;
-    unordered_map<string,bool> signals_temp;
-    vector<port_name> ports_temp;
+    vector<e_in_scc> e;
     vector<string> gates;
     vector<string> signals;
 };
 
 vector<scc_node> G_scc;
-
 
 
 
@@ -132,9 +93,9 @@ void tarjan(int u)
 
 
     //dfs
-    for(int i=0;i<G[u].e.size();i++)
+    for(int i=0;i<G[u].e[0].to.size();i++)
     {
-        int v=G[u].e[i].to;
+        int v=G[u].e[0].to[i];
         //dfn[v]=-1，该节点为新节点
         if(dfn[v]==-1)
         {
@@ -163,6 +124,8 @@ void tarjan(int u)
         }while(u!=k); 
 
         G_scc.push_back(scc_node1);
+
+        //更新结点的SCC信息；
         for(int i=0;i<scc_node1.node.size();i++)
         {
             int v=scc_node1.node[i];
@@ -170,6 +133,7 @@ void tarjan(int u)
         }
     }
 }
+
 
 int main(int argc,char *argv[])
 {
@@ -225,6 +189,8 @@ int main(int argc,char *argv[])
         }
 
         G.push_back(node1);
+
+
         HE[output_wire].name=output_wire;
 
         HE[output_wire].fro.push_back(node_id);
@@ -233,7 +199,7 @@ int main(int argc,char *argv[])
         {
             HE[input_wires[i]].name=input_wires[i];
             HE[input_wires[i]].to.push_back(node_id);
-            HE[input_wires[i]].in_ports.push_back({node_id,i+1});
+            HE[input_wires[i]].to_ports.push_back({node_id,i+1});
         }
 
         gate_num++;
@@ -241,11 +207,46 @@ int main(int argc,char *argv[])
 
     file.close();
 
-    //超边转换为边，构建有向图
-    he_to_e(HE,E);
+    for(auto &pair:HE)
+    {
+        h_edge &edge=pair.second;
+        //输出端口的信号线
+        if(edge.fro.size()==0)
+        {
+            Node node1;
+            node1.name=edge.name;
+            node1.gate_type=inp;
+            edge.fro.push_back(gate_num);
+            node1.e.push_back(edge);
+            G.push_back(node1);
+            gate_num++;
+        }
+        else 
+        {
+            int node_id=edge.fro[0];
+            G[node_id].e.push_back(edge);
+        }
 
+    }
+/*
+    for(int i=0;i<G.size();i++)
+    {
+        cout<<i<<":"<<G[i].name<<" "<<G[i].gate_type<<":";
+        cout<<"e:"<<G[i].e[0].name<<endl;
+    }
 
+    for(auto &pair:HE)
+    {
+        cout<<pair.second.name<<" ";
+        for(int i=0;i<pair.second.to.size();i++)
+        {
+            cout<<G[pair.second.to_ports[i].node].name<<" ";
+            cout<<pair.second.to_ports[i].port<<" ";
+        }
+        cout<<endl;
+    }
 
+*/
     for(int i=0;i<gate_num;i++)
     {
         vis.push_back(0);
@@ -264,41 +265,43 @@ int main(int argc,char *argv[])
     }
     
 
-    //构建scc之中边的关系
-    for(int i=0;i<E.size();i++)
-    {
-        int fro=E[i].fro;
-        int to=E[i].to;
-        
-        int scc_fro=G[fro].scc;
-        int scc_to=G[to].scc;
 
-        if(scc_fro==scc_to)
+    //构建scc之中边的关系
+
+    for(auto pair:HE)
+    {
+        h_edge &edge=pair.second;
+        int u1=edge.fro[0];
+        for(int i=0;i<edge.to.size();i++)
         {
-            G_scc[scc_fro].e_in.push_back(E[i]);
-            G_scc[scc_to].signals_temp[E[i].name]=1;
-            G_scc[scc_to].ports_temp.push_back(E[i].in_ports);
-        }
-        else 
-        {
-            G_scc[scc_fro].e_out.push_back(E[i]);
+            int v1=edge.to[i];
+            if(G[u1].scc==G[v1].scc)
+            {
+                G_scc[G[u1].scc].e.push_back({edge,edge.to_ports[i]});
+            }
         }
     }
-    
 
     for(int i=0;i<G_scc.size();i++)
     {
-        for(auto &pair:G_scc[i].signals_temp)
+        unordered_map<string,bool> signal_map;
+        for(int j=0;j<G_scc[i].e.size();j++)
+        {
+            h_edge &edge=G_scc[i].e[j].edge;
+            port_name port=G_scc[i].e[j].port;
+            string signal_name=edge.name;
+            signal_map[signal_name]=true;
+            string gate_name;
+            gate_name=G[port.node].name+".port"+to_string(port.port);
+            G_scc[i].gates.push_back(gate_name);
+        }
+
+        for(auto &pair:signal_map)
         {
             G_scc[i].signals.push_back(pair.first);
         }
-        for(int j=0;j<G_scc[i].ports_temp.size();j++)
-        {
-            string temp1;
-            temp1=G[G_scc[i].ports_temp[j].node].name+".port"+to_string(G_scc[i].ports_temp[j].port);
-            G_scc[i].gates.push_back(temp1);
-        }
     }
+
 
     //输出第一题结果
     ofstream outputFile("result_1.txt");
@@ -315,15 +318,20 @@ int main(int argc,char *argv[])
             //输出信号线;
             outputFile<<"Loop Signals:";
             for(int j=0;j<G_scc[i].signals.size();j++)
-            {
-                outputFile<<G_scc[i].signals[j]<<",";
+            {   if(j==0)
+                outputFile<<G_scc[i].signals[j];
+                else 
+                outputFile<<","<<G_scc[i].signals[j];
             }
             outputFile<<endl;
             //输出门信息
             outputFile<<"Loop Gates:";
             for(int j=0;j<G_scc[i].gates.size();j++)
             {
-                outputFile<<G_scc[i].gates[j]<<",";
+                if(j==0)
+                outputFile<<G_scc[i].gates[j];
+                else 
+                outputFile<<","<<G_scc[i].gates[j];
             }
             outputFile<<endl;
             num1++;
@@ -334,7 +342,6 @@ int main(int argc,char *argv[])
     else {
     std::cerr << "Failed to open the file." << std::endl;
     }
-
 
 
     return 0;
