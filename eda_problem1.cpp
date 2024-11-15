@@ -53,6 +53,7 @@ struct Node
     TYPE gate_type;
     vector<h_edge> e;
     int scc;//所属scc序号
+    vector<port_name> to_ports;
 };
 
 vector<Node> G;
@@ -77,6 +78,8 @@ struct scc_node
 vector<scc_node> G_scc;
 
 
+vector<vector<Node>> scc_vec;
+
 
 //tarjan求解scc
 vector<bool> vis;
@@ -84,6 +87,15 @@ vector<int> dfn;
 vector<int> low;
 stack<int> st;
 int tot=0;
+
+//存储结点在scc_vec之中的位置
+struct scc_place
+{
+    int first;
+    int second;
+};
+unordered_map<int,scc_place> scc_place_map;
+int first_temp=0;
 
 void tarjan(int u)
 {
@@ -115,24 +127,45 @@ void tarjan(int u)
 
     if(low[u]==dfn[u])//说明u是scc的祖先结点
     {
+
+        int second_temp=0;
+        
         int k=-1;
         scc_node scc_node1;
+        vector<Node> scc1;
+        
         do
         {
             k=st.top();
             vis[k]=0;
             st.pop();
             scc_node1.node.push_back(k);
+
+            Node node1;
+            node1.name=G[k].name;
+            node1.gate_type=G[k].gate_type;
+            node1.e=G[k].e;
+            scc1.push_back(node1);
+            
+            scc_place_map[k].first=first_temp;
+            scc_place_map[k].second=second_temp;
+            second_temp++;
+            
         }while(u!=k); 
 
         G_scc.push_back(scc_node1);
-
+        scc_vec.push_back(scc1);
+        first_temp++;
+        
+        
+        
         //更新结点的SCC信息；
         for(int i=0;i<scc_node1.node.size();i++)
         {
             int v=scc_node1.node[i];
             G[v].scc=G_scc.size()-1;
         }
+        
     }
 }
 
@@ -283,6 +316,7 @@ int main(int argc,char *argv[])
             if(G[u1].scc==G[v1].scc)
             {
                 G_scc[G[u1].scc].e.push_back({edge,edge.to_ports[i]});
+                scc_vec[scc_place_map[u1].first][scc_place_map[u1].second].to_ports.push_back(edge.to_ports[i]);
             }
             else 
             {
@@ -290,6 +324,8 @@ int main(int argc,char *argv[])
             }
         }
     }
+
+
 
     for(int i=0;i<G_scc.size();i++)
     {
@@ -358,6 +394,14 @@ int main(int argc,char *argv[])
     std::cerr << "Failed to open the file." << std::endl;
     }
 
+    //开始第二问
+    auto start2=std::chrono::high_resolution_clock::now();
+    
+
+    auto end2=std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration2=end2-start2;
+    
+    
     
     return 0;
 
