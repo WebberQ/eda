@@ -30,6 +30,7 @@ struct port_name
 {
     int node;
     int port;
+    int in;//是否为scc的输入结点
 };
 
 
@@ -40,6 +41,7 @@ struct h_edge
     vector<int> fro;
     vector<int> to;
     vector<port_name> to_ports;
+    vector<int> cir;
 };
 
 //超边集合和边集合
@@ -49,11 +51,14 @@ unordered_map<string,h_edge> HE;
 
 struct Node
 {
+    int id;
     string name;
     TYPE gate_type;
     vector<h_edge> e;
     int scc;//所属scc序号
     vector<port_name> to_ports;
+    vector<port_name> in_ports;
+    vector<int> cir;//所属的环
 };
 
 vector<Node> G;
@@ -65,7 +70,7 @@ struct e_in_scc
     port_name port;
 };
 
-
+//便于输出的scc格式
 struct scc_node
 {
     vector<int> node;
@@ -145,6 +150,7 @@ void tarjan(int u)
             node1.name=G[k].name;
             node1.gate_type=G[k].gate_type;
             node1.e=G[k].e;
+            node1.id=k;
             scc1.push_back(node1);
             
             scc_place_map[k].first=first_temp;
@@ -168,6 +174,75 @@ void tarjan(int u)
         
     }
 }
+
+
+
+//johnson找到所有的环
+int cir_count;
+
+
+
+void johnson(int u1,vector<Node> &scc1)
+{
+    vis[u1]=1;
+    st.push(u1);
+
+    
+    for(int i=0;i<scc1[scc_place_map[u1].second].to_ports.size();i++)
+    {
+    
+
+        port_name port1=scc1[scc_place_map[u1].second].to_ports[i];
+        scc1[scc_place_map[u1].second].to_ports[i].in=0;
+        port1.in=0;
+        scc1[scc_place_map[port1.node].second].in_ports.push_back(port1);
+        
+        
+        int v1=scc1[scc_place_map[u1].second].to_ports[i].node;
+
+        if(vis[v1]==0)
+        {
+            johnson(v1,scc1);
+        }
+        
+        else
+        {
+            vector<int> st_temp;
+            int k1=v1;
+            while(true)
+            {
+                scc1[scc_place_map[k1].second].cir.push_back(cir_count);
+                k1=st.top();
+                if(k1==v1) break;
+                st.pop();
+                st_temp.push_back(k1);
+            }
+            cir_count++;
+            for(int j=0;j<st_temp.size();j++)
+            {
+                st.push(st_temp[st_temp.size()-1-j]);
+            }
+        }
+
+
+        //两个输入端口相同的情况
+        if(i==1)
+        {
+            if(scc1[scc_place_map[u1].second].to_ports[0].node==scc1[scc_place_map[u1].second].to_ports[1].node)
+            {
+            scc1[scc_place_map[u1].second].to_ports[1].in=0;
+            port_name port2=scc1[scc_place_map[u1].second].to_ports[1];
+            scc1[scc_place_map[port1.node].second].in_ports.push_back(port2);   
+            break;
+            }
+        }
+        
+    }
+    
+    st.pop();
+    return;
+}
+
 
 
 int main(int argc,char *argv[])
@@ -216,6 +291,7 @@ int main(int argc,char *argv[])
 
         Node node1;
         node1.name=gate_name;
+        node1.id=node_id;
         if(gate_type_str=="not1") node1.gate_type=not11;
         else if(gate_type_str=="or2") node1.gate_type=or2;
         else if(gate_type_str=="nand2") node1.gate_type=nand2;
@@ -237,7 +313,7 @@ int main(int argc,char *argv[])
         {
             HE[input_wires[i]].name=input_wires[i];
             HE[input_wires[i]].to.push_back(node_id);
-            HE[input_wires[i]].to_ports.push_back({node_id,i+1});
+            HE[input_wires[i]].to_ports.push_back({node_id,i+1,1});
         }
 
         gate_num++;
@@ -396,8 +472,89 @@ int main(int argc,char *argv[])
 
     //开始第二问
     auto start2=std::chrono::high_resolution_clock::now();
+
+
+
+    /*检查端口关系是否正确
+    for(int i=0;i<scc_vec.size();i++)
+    {
+        for(int j=0;j<scc_vec[i].size();j++)
+        {
+            cout<<scc_vec[i][j].name<<" ";
+            for(int k=0;k<scc_vec[i][j].to_ports.size();k++)
+            {
+                cout<<scc_vec[i][j].to_ports[k].node<<".port";
+                cout<<scc_vec[i][j].to_ports[k].port<<" ";
+            }
+            cout<<endl;
+        }
+    }
+    */
+
     
 
+    //初始化vis、st
+    for(int i=0;i<vis.size();i++)
+    vis[i]=0;
+    while(!st.empty())
+    {
+        st.pop();
+    }
+    
+    for(int i=0;i<scc_vec.size();i++)
+    {
+        
+        if(scc_vec[i].size()==1) continue;
+        cir_count=0;
+        johnson(scc_vec[i][0].id,scc_vec[i]);
+        /*检查环路是否正确
+        for(int j=0;j<scc_vec[i].size();j++)
+        {
+            cout<<scc_vec[i][j].name<<" ";
+            for(int k=0;k<scc_vec[i][j].cir.size();k++)
+            {
+                cout<<scc_vec[i][j].cir[k]<<" ";
+            }
+            cout<<endl;
+        }
+        */
+     
+        //向结点添加输入端口
+        for(int j=0;j<scc_vec[i].size();j++)
+        {
+            Node& node1=scc_vec[i][j];
+            if(node1.gate_type==not11) continue;// not不可能有额外的输入端口
+            else
+            {
+                if(node1.in_ports.size()!=2)
+                {
+                    port_name port1;
+                    port1.in=1;
+                    port1.node=node1.id;
+                    if(node1.in_ports[0].port==1)
+                    port1.port=2;
+                    else port1.port=1;
+                    node1.in_ports.push_back(port1);
+                }
+            }
+        }
+        
+
+        /*检查输入端口添加是否正确；
+        for(int j=0;j<scc_vec[i].size();j++)
+        {
+            cout<<scc_vec[i][j].name<<" ";
+            for(int k=0;k<scc_vec[i][j].in_ports.size();k++)
+            {
+                cout<<"port"<<k+1<<":"<<scc_vec[i][j].in_ports[k].in<<" ";
+            }
+            cout<<endl;
+        }
+       */
+       
+    }
+
+    
     auto end2=std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration2=end2-start2;
     
