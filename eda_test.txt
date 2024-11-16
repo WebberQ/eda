@@ -8,4 +8,4 @@ module name is combLogic
 6  : nand2  I5_0  w_5_0  w_4_0  w_0_2  
 7  : nand2  I5_1  w_5_1  w_2_0  w_4_0  
 8  : not1   I5_2  w_5_2  w_0_3  
-9  : not1   I6_0  w_0_0  w_5_0 
+9  : not1   I6_0  w_0_0    w_5_0
