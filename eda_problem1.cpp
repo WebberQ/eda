@@ -244,6 +244,60 @@ void johnson(int u1,vector<Node> &scc1)
 }
 
 
+bool oscilation_judge0(vector<Node> &scc1,vector<string> &signals)
+{
+    int not_num=0;//统计负反馈数目
+    bool locked=0;//如果某个输入锁定locked=1，然而在一个环的情况下，锁定的情况不存在；
+    for(int i=0;i<scc1.size();i++)
+    {
+        Node &node1=scc1[i];
+        if(node1.gate_type==not11)//not
+        {
+            not_num++;    
+        }
+        else if(node1.gate_type==and2)
+        {
+            for(int j=0;j<node1.in_ports.size();j++)
+            {
+                if(node1.in_ports[j].in==1)
+                {
+                    string signal_temp=node1.name+".port"+to_string(node1.in_ports[j].port)+"=1";
+                    signals.push_back(signal_temp);
+                }
+            }
+        }
+        else if(node1.gate_type==or2)
+        {
+            for(int j=0;j<node1.in_ports.size();j++)
+            {
+                if(node1.in_ports[j].in==1)
+                {
+                    string signal_temp=node1.name+".port"+to_string(node1.in_ports[j].port)+"=0";
+                    signals.push_back(signal_temp);
+                }
+            }
+        }
+        else if(node1.gate_type==nand2)
+        {
+            not_num++;
+            for(int j=0;j<node1.in_ports.size();j++)
+            {
+                if(node1.in_ports[j].in==1)
+                {
+                    string signal_temp=node1.name+".port"+to_string(node1.in_ports[j].port)+"=1";
+                    signals.push_back(signal_temp);
+                }
+            }
+        }
+    }
+    
+
+    
+    if(not_num%2==0)
+    return false;
+    else return true;
+}
+
 
 int main(int argc,char *argv[])
 {
@@ -472,8 +526,9 @@ int main(int argc,char *argv[])
 
     //开始第二问
     auto start2=std::chrono::high_resolution_clock::now();
-
-
+    vector<vector<string>> osc_cannt;
+    vector<vector<string>> osc_can;
+    vector<vector<string>> osc_can_condition;
 
     /*检查端口关系是否正确
     for(int i=0;i<scc_vec.size();i++)
@@ -551,9 +606,26 @@ int main(int argc,char *argv[])
             cout<<endl;
         }
        */
+
+
+        //该scc之中只有一个环
+        if(cir_count==0)
+        {
+            vector<string> signals_temp;
+            if(oscilation_judge0(scc_vec[i],signals_temp))//如果能振荡
+            {
+                sort(signals_temp.begin(),signals_temp.end());
+                osc_can_condition.push_back(signals_temp);
+                osc_can.push_back(G_scc[i].gates);
+            }
+            else//如果不能振荡
+            {
+                osc_cannt.push_back(G_scc[i].gates);
+            }
+        }
        
     }
-
+    
     
     auto end2=std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration2=end2-start2;
