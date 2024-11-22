@@ -524,11 +524,15 @@ int main(int argc,char *argv[])
     std::cerr << "Failed to open the file." << std::endl;
     }
 
+    outputFile.close();
+
     //开始第二问
     auto start2=std::chrono::high_resolution_clock::now();
-    vector<vector<string>> osc_cannt;
-    vector<vector<string>> osc_can;
-    vector<vector<string>> osc_can_condition;
+    vector<vector<string>> osc_cannt_gates;
+    vector<vector<string>> osc_cannt_signals;
+    vector<vector<string>> osc_can_gates;
+    vector<vector<string>> osc_can_conditions;
+    vector<vector<string>> osc_can_signals;
 
     /*检查端口关系是否正确
     for(int i=0;i<scc_vec.size();i++)
@@ -546,7 +550,7 @@ int main(int argc,char *argv[])
     }
     */
 
-    
+
 
     //初始化vis、st
     for(int i=0;i<vis.size();i++)
@@ -609,27 +613,115 @@ int main(int argc,char *argv[])
 
 
         //该scc之中只有一个环
-        if(cir_count==0)
+        if(cir_count==1)
         {
             vector<string> signals_temp;
             if(oscilation_judge0(scc_vec[i],signals_temp))//如果能振荡
             {
                 sort(signals_temp.begin(),signals_temp.end());
-                osc_can_condition.push_back(signals_temp);
-                osc_can.push_back(G_scc[i].gates);
+                osc_can_conditions.push_back(signals_temp);
+                osc_can_gates.push_back(G_scc[i].gates);
+                osc_can_signals.push_back(G_scc[i].signals);
             }
             else//如果不能振荡
             {
-                osc_cannt.push_back(G_scc[i].gates);
+                osc_cannt_gates.push_back(G_scc[i].gates);
+                osc_cannt_signals.push_back(G_scc[i].signals);
             }
         }
        
     }
+
+
+
+
+    ofstream outputFile2("result_2.txt");
+    if(outputFile2.is_open())
+    {
+        for(int i=0;i<osc_cannt_gates.size();i++)
+        {
+            outputFile2<<i+1<<")"<<endl;
+            outputFile2<<"Loop Signals:";
+            for(int j=0;j<osc_cannt_signals[i].size();j++)
+            {
+                if(j==0)
+                {
+                outputFile2<<osc_cannt_signals[i][j];
+                }
+                else
+                {
+                outputFile2<<","<<osc_cannt_signals[i][j];
+                }
+            }
+            for(int j=0;j<osc_cannt_gates[i].size();j++)
+            {
+                if(j==0)
+                {
+                outputFile2<<endl<<"Loop Gate:"<<osc_cannt_gates[i][j];
+                }
+                else
+                {
+                outputFile2<<","<<osc_cannt_gates[i][j];
+                }
+            }
+        }
+    }
+    else {
+    std::cerr << "Failed to open the file." << std::endl;
+    }
+    outputFile2.close();
+
     
+    ofstream outputFile3("result_3.txt");
+    if(outputFile3.is_open())
+    {
+        for(int i=0;i<osc_can_gates.size();i++)
+        {
+            outputFile3<<i+1<<")"<<endl;
+            outputFile3<<"Loop Signals:";
+            for(int j=0;j<osc_can_signals[i].size();j++)
+            {
+                if(j==0)
+                {
+                outputFile3<<osc_can_signals[i][j];
+                }
+                else
+                {
+                outputFile3<<","<<osc_can_signals[i][j];
+                }
+            }
+            for(int j=0;j<osc_can_gates[i].size();j++)
+            {
+                if(j==0)
+                {
+                outputFile3<<endl<<"Loop Gate:"<<osc_can_gates[i][j];
+                }
+                else
+                {
+                outputFile3<<","<<osc_can_gates[i][j];
+                }
+            }
+            for(int j=0;j<osc_can_conditions[i].size();j++)
+            {
+                if(j==0)
+                {
+                outputFile3<<endl<<"Loop Condition:"<<osc_can_conditions[i][j];
+                }
+                else
+                {
+                outputFile3<<","<<osc_can_conditions[i][j];
+                }
+            }        
+            }
+    }
+    else {
+    std::cerr << "Failed to open the file." << std::endl;
+    }
+    outputFile3.close();
     
     auto end2=std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration2=end2-start2;
-    
+    cout<<"Time taken of Problem2 and Problem3:"<<duration2.count()<<"seconds"<<endl;
     
     
     return 0;
