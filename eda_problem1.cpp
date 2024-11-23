@@ -24,6 +24,56 @@ enum TYPE
     nand2,
     and2
 };
+enum value
+{
+    zero,
+    one,
+    x,
+    x_prime
+};
+
+value NOT(value value1)
+{
+    if(value1==zero) return one;
+    else if(value1==one) return zero;
+    else if(value1==x) return x_prime;
+    else if(value1==x_prime) return x;
+    return one;
+}
+
+value AND(value b,value a)
+{
+    if(a==0||b==0) return zero;
+    else if(a==1) return b;
+    else if(b==1) return a;
+    else if(a==b) return a;
+    else if(a!=b) return zero;
+    else return one;
+}
+
+
+value OR(value a,value b)
+{
+    if(a==1||b==1) return one;
+    else if(a==0) return b;
+    else if(b==0) return a;
+
+    else if(a==b) return a;
+    else if(a!=b) return one;
+    return one;
+}
+
+value NAND(value b,value a)
+{
+    if(a==0||b==0) return one;
+    else if(a==1) return NOT(b);
+    else if(b==1) return NOT(a);
+    
+    else if(a==b) return NOT(a);
+    else if(a!=b) return one;
+    return one;
+}
+
 
 //存储端口名称，包括结点名和端口名
 struct port_name
@@ -59,6 +109,11 @@ struct Node
     vector<port_name> to_ports;
     vector<port_name> in_ports;
     vector<int> cir;//所属的环
+    //johnson之中添加
+    vector<int> input;
+    //以下变量在judge2之中加入
+    int indeg;
+    value gate_value;
 };
 
 vector<Node> G;
@@ -177,6 +232,9 @@ void tarjan(int u)
 
 
 
+//记录可以振荡的环的连线
+
+vector<vector<string>> cir_can_signals;
 //johnson找到所有的环
 int cir_count;
 
@@ -190,13 +248,15 @@ void johnson(int u1,vector<Node> &scc1)
     
     for(int i=0;i<scc1[scc_place_map[u1].second].to_ports.size();i++)
     {
-    
 
-        port_name port1=scc1[scc_place_map[u1].second].to_ports[i];
+        port_name &port1=scc1[scc_place_map[u1].second].to_ports[i];
         scc1[scc_place_map[u1].second].to_ports[i].in=0;
         port1.in=0;
         scc1[scc_place_map[port1.node].second].in_ports.push_back(port1);
-        
+   
+
+        //为方便后面的judge2，记录输入结点
+        scc1[scc_place_map[port1.node].second].input.push_back(u1);
         
         int v1=scc1[scc_place_map[u1].second].to_ports[i].node;
 
@@ -207,21 +267,18 @@ void johnson(int u1,vector<Node> &scc1)
         
         else
         {
-            vector<int> st_temp;
             int k1=v1;
+            queue<int> q_temp;
             while(true)
             {
                 scc1[scc_place_map[k1].second].cir.push_back(cir_count);
                 k1=st.top();
                 if(k1==v1) break;
                 st.pop();
-                st_temp.push_back(k1);
+                q_temp.push(k1);
+                vis[k1]=0;
             }
             cir_count++;
-            for(int j=0;j<st_temp.size();j++)
-            {
-                st.push(st_temp[st_temp.size()-1-j]);
-            }
         }
 
 
@@ -231,7 +288,7 @@ void johnson(int u1,vector<Node> &scc1)
             if(scc1[scc_place_map[u1].second].to_ports[0].node==scc1[scc_place_map[u1].second].to_ports[1].node)
             {
             scc1[scc_place_map[u1].second].to_ports[1].in=0;
-            port_name port2=scc1[scc_place_map[u1].second].to_ports[1];
+            port_name port2=scc1                                     [scc_place_map[u1].second].to_ports[1];
             scc1[scc_place_map[port1.node].second].in_ports.push_back(port2);   
             break;
             }
@@ -243,7 +300,7 @@ void johnson(int u1,vector<Node> &scc1)
     return;
 }
 
-
+//判断单环起振
 bool oscilation_judge0(vector<Node> &scc1,vector<string> &signals)
 {
     int not_num=0;//统计负反馈数目
@@ -298,6 +355,218 @@ bool oscilation_judge0(vector<Node> &scc1,vector<string> &signals)
     else return true;
 }
 
+
+queue<int> topo_q;
+vector<int> topo_vec;
+void topo(int start,vector<Node> &scc1)
+{
+    topo_q.push(scc1[start].id);
+    topo_vec.push_back(scc1[start].id);
+
+    while(!topo_q.empty())
+    {
+        int u1=topo_q.front();
+        topo_q.pop();
+        for(int i=0;i<scc1[scc_place_map[u1].second].to_ports.size();i++)
+        {
+            int v1=scc1[scc_place_map[u1].second].to_ports[i].node;
+            scc1[scc_place_map[v1].second].indeg--;
+            if(scc1[scc_place_map[v1].second].indeg==0)
+            {
+                topo_q.push(scc1[scc_place_map[v1].second].id);
+                topo_vec.push_back(scc1[scc_place_map[v1].second].id);
+            }
+        }
+    }
+
+}
+//判断双环起振
+bool oscilation_judge1(vector<Node> &scc1,vector<string> &signals)
+{
+
+    int non_num0=0;
+    int non_num1=0;
+    int double_cir_start=-1;//记录双环共用的某个结点作为拓扑起点和终点
+    vector<string> wires0;
+    vector<string> wires1;
+
+
+    for(int i=0;i<scc1.size();i++)
+    {
+        Node &node1=scc1[i];
+        if(node1.cir.size()==2)
+        {
+            double_cir_start=i;
+        }
+
+        if(node1.gate_type==not11)
+        {
+            node1.indeg=1;
+            if(node1.cir.size()==2)
+            {
+                non_num0++;
+                non_num1++;
+                wires0.push_back(node1.e[0].name);
+                wires1.push_back(node1.e[0].name);
+            }
+            else if(node1.cir[0]==0)
+            {
+                non_num0++;
+                wires0.push_back(node1.e[0].name);
+            }
+            else 
+            {non_num1++;
+            wires1.push_back(node1.e[0].name);
+            }
+        }
+        else if(node1.gate_type==and2)
+        {
+            int indeg_temp=0;
+            for(int j=0;j<node1.in_ports.size();j++)
+            {
+                if(node1.in_ports[j].in==1)
+                {   
+                    indeg_temp++;
+                    string signal_temp=node1.name+".port"+to_string(node1.in_ports[j].port)+"=1";
+                    signals.push_back(signal_temp);
+                }
+
+            }
+            node1.indeg=2-indeg_temp;
+            if(node1.cir.size()==2)
+            {
+                wires0.push_back(node1.e[0].name);
+                wires1.push_back(node1.e[0].name);
+            }
+            else if(node1.cir[0]==0)
+            {
+                wires0.push_back(node1.e[0].name);
+            }
+            else 
+            {
+            wires1.push_back(node1.e[0].name);
+            }
+        }
+        else if(node1.gate_type==or2)
+        {
+            int indeg_temp=0;
+            for(int j=0;j<node1.in_ports.size();j++)
+            {
+                if(node1.in_ports[j].in==1)
+                {
+                    indeg_temp++;
+                    string signal_temp=node1.name+".port"+to_string(node1.in_ports[j].port)+"=0";
+                    signals.push_back(signal_temp);
+                }
+            }
+            node1.indeg=2-indeg_temp;
+            if(node1.cir.size()==2)
+            {
+                wires0.push_back(node1.e[0].name);
+                wires1.push_back(node1.e[0].name);
+            }
+            else if(node1.cir[0]==0)
+            {
+                wires0.push_back(node1.e[0].name);
+            }
+            else 
+            {
+            wires1.push_back(node1.e[0].name);
+            }
+        }
+        else if(node1.gate_type==nand2)
+        {
+            int indeg_temp=0;
+            for(int j=0;j<node1.in_ports.size();j++)
+            {
+                if(node1.in_ports[j].in==1)
+                {
+                    indeg_temp++;
+                    string signal_temp=node1.name+".port"+to_string(node1.in_ports[j].port)+"=1";
+                    signals.push_back(signal_temp);
+                }
+            }
+            node1.indeg=2-indeg_temp;
+            if(node1.cir.size()==2)
+            {
+                non_num1++;
+                non_num0++;
+                wires1.push_back(node1.e[0].name);
+                wires0.push_back(node1.e[0].name);
+            }
+            else if(node1.cir[0]==0)
+            {
+                non_num0++;
+                wires0.push_back(node1.e[0].name);
+            }
+            else 
+            {
+                non_num1++;
+                wires1.push_back(node1.e[0].name);
+            }
+        }
+    }
+
+    
+    //负反馈数量都是奇数才会起振
+    if(non_num1%2==1&&non_num0%2==1)
+    {
+        cir_can_signals.push_back(wires0);
+        cir_can_signals.push_back(wires1);
+        return true;
+    }
+    
+    else return false;
+
+
+/*貌似是都没用
+    topo(double_cir_start,scc1);
+    
+
+    scc1[scc_place_map[topo_vec[0]].second].gate_value=x;
+    value value1;
+    for(int i=1;i<topo_vec.size();i++)
+    {
+        Node &node1=scc1[scc_place_map[topo_vec[i]].second];
+        if(node1.gate_type==not11)
+        {
+            node1.gate_value=NOT(scc1[scc_place_map[node1.input[0]].second].gate_value);
+        }
+        else if(node1.gate_type==and2)
+        {
+            if(node1.input.size()==2)
+            node1.gate_value=AND(scc1[scc_place_map[node1.input[0]].second].gate_value,scc1[scc_place_map[node1.input[1]].second].gate_value);
+            else node1.gate_value=scc1[scc_place_map[node1.input[0]].second].gate_value;
+        }
+        else if(node1.gate_type==or2)
+        {
+            if(node1.input.size()==2)
+            node1.gate_value=OR(scc1[scc_place_map[node1.input[0]].second].gate_value,scc1[scc_place_map[node1.input[1]].second].gate_value);
+            else node1.gate_value=scc1[scc_place_map[node1.input[0]].second].gate_value;
+        }
+        else if(node1.gate_type==nand2)
+        {
+            if(node1.input.size()==2)
+            node1.gate_value=NAND(scc1[scc_place_map[node1.input[0]].second].gate_value,scc1[scc_place_map[node1.input[1]].second].gate_value);
+            else node1.gate_value=NOT(scc1[scc_place_map[node1.input[0]].second].gate_value);
+        }
+
+        if(node1.gate_value==zero||node1.gate_value==one)
+        return false;
+        value1=node1.gate_value;
+    }
+
+    if(value1==x_prime)  
+    {
+        cir_can_signals.push_back(wires0);
+        cir_can_signals.push_back(wires1);
+        return true;
+    }
+
+    else return false;
+    */
+
+}
 
 int main(int argc,char *argv[])
 {
@@ -396,25 +665,7 @@ int main(int argc,char *argv[])
         }
 
     }
-/*
-    for(int i=0;i<G.size();i++)
-    {
-        cout<<i<<":"<<G[i].name<<" "<<G[i].gate_type<<":";
-        cout<<"e:"<<G[i].e[0].name<<endl;
-    }
 
-    for(auto &pair:HE)
-    {
-        cout<<pair.second.name<<" ";
-        for(int i=0;i<pair.second.to.size();i++)
-        {
-            cout<<G[pair.second.to_ports[i].node].name<<" ";
-            cout<<pair.second.to_ports[i].port<<" ";
-        }
-        cout<<endl;
-    }
-
-*/
     for(int i=0;i<gate_num;i++)
     {
         vis.push_back(0);
@@ -432,7 +683,6 @@ int main(int argc,char *argv[])
         }
     }
     
-
 
     //构建scc之中边的关系
 
@@ -534,27 +784,10 @@ int main(int argc,char *argv[])
     vector<vector<string>> osc_can_conditions;
     vector<vector<string>> osc_can_signals;
 
-    /*检查端口关系是否正确
-    for(int i=0;i<scc_vec.size();i++)
-    {
-        for(int j=0;j<scc_vec[i].size();j++)
-        {
-            cout<<scc_vec[i][j].name<<" ";
-            for(int k=0;k<scc_vec[i][j].to_ports.size();k++)
-            {
-                cout<<scc_vec[i][j].to_ports[k].node<<".port";
-                cout<<scc_vec[i][j].to_ports[k].port<<" ";
-            }
-            cout<<endl;
-        }
-    }
-    */
-
-
-
-    //初始化vis、st
     for(int i=0;i<vis.size();i++)
-    vis[i]=0;
+    {
+        vis[i]=0;
+    }
     while(!st.empty())
     {
         st.pop();
@@ -562,21 +795,17 @@ int main(int argc,char *argv[])
     
     for(int i=0;i<scc_vec.size();i++)
     {
-        
+
+
+        for(int j=0;j<scc_vec[i].size();j++)
+        {
+            std::cout<<scc_vec[i][j].name<<endl;
+        }
+
         if(scc_vec[i].size()==1) continue;
         cir_count=0;
         johnson(scc_vec[i][0].id,scc_vec[i]);
-        /*检查环路是否正确
-        for(int j=0;j<scc_vec[i].size();j++)
-        {
-            cout<<scc_vec[i][j].name<<" ";
-            for(int k=0;k<scc_vec[i][j].cir.size();k++)
-            {
-                cout<<scc_vec[i][j].cir[k]<<" ";
-            }
-            cout<<endl;
-        }
-        */
+    
      
         //向结点添加输入端口
         for(int j=0;j<scc_vec[i].size();j++)
@@ -597,20 +826,6 @@ int main(int argc,char *argv[])
                 }
             }
         }
-        
-
-        /*检查输入端口添加是否正确；
-        for(int j=0;j<scc_vec[i].size();j++)
-        {
-            cout<<scc_vec[i][j].name<<" ";
-            for(int k=0;k<scc_vec[i][j].in_ports.size();k++)
-            {
-                cout<<"port"<<k+1<<":"<<scc_vec[i][j].in_ports[k].in<<" ";
-            }
-            cout<<endl;
-        }
-       */
-
 
         //该scc之中只有一个环
         if(cir_count==1)
@@ -622,6 +837,7 @@ int main(int argc,char *argv[])
                 osc_can_conditions.push_back(signals_temp);
                 osc_can_gates.push_back(G_scc[i].gates);
                 osc_can_signals.push_back(G_scc[i].signals);
+                cir_can_signals.push_back(G_scc[i].signals);
             }
             else//如果不能振荡
             {
@@ -629,11 +845,25 @@ int main(int argc,char *argv[])
                 osc_cannt_signals.push_back(G_scc[i].signals);
             }
         }
-       
+
+        else if(cir_count==2)
+        {
+            vector<string> signals_temp;
+            if(oscilation_judge1(scc_vec[i],signals_temp))
+            {
+             sort(signals_temp.begin(),signals_temp.end());
+             osc_can_conditions.push_back(signals_temp);
+             osc_can_gates.push_back(G_scc[i].gates);
+             osc_can_signals.push_back(G_scc[i].signals);
+            }
+            else
+            {
+                osc_cannt_gates.push_back(G_scc[i].gates);
+                osc_cannt_signals.push_back(G_scc[i].signals);
+            }
+        }
+        
     }
-
-
-
 
     ofstream outputFile2("result_2.txt");
     if(outputFile2.is_open())
@@ -722,7 +952,7 @@ int main(int argc,char *argv[])
     auto end2=std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration2=end2-start2;
     cout<<"Time taken of Problem2 and Problem3:"<<duration2.count()<<"seconds"<<endl;
-    
+
     
     return 0;
 
