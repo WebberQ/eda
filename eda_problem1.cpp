@@ -268,27 +268,32 @@ void johnson(int u1,vector<Node> &scc1)
         else
         {
             int k1=v1;
-            queue<int> q_temp;
+            stack<int> st_temp;
             while(true)
             {
                 scc1[scc_place_map[k1].second].cir.push_back(cir_count);
                 k1=st.top();
                 if(k1==v1) break;
                 st.pop();
-                q_temp.push(k1);
-                vis[k1]=0;
+                st_temp.push(k1);
             }
             cir_count++;
+            while(!st_temp.empty())
+            {
+                int v2=st_temp.top();
+                st_temp.pop();
+                st.push(v2);
+            }
         }
 
 
         //两个输入端口相同的情况
-        if(i==1)
+        if(i==0&&scc1[scc_place_map[u1].second].to_ports.size()==2)
         {
             if(scc1[scc_place_map[u1].second].to_ports[0].node==scc1[scc_place_map[u1].second].to_ports[1].node)
             {
             scc1[scc_place_map[u1].second].to_ports[1].in=0;
-            port_name port2=scc1                                     [scc_place_map[u1].second].to_ports[1];
+            port_name port2=scc1[scc_place_map[u1].second].to_ports[1];
             scc1[scc_place_map[port1.node].second].in_ports.push_back(port2);   
             break;
             }
@@ -297,6 +302,7 @@ void johnson(int u1,vector<Node> &scc1)
     }
     
     st.pop();
+    vis[u1]=0;
     return;
 }
 
@@ -507,16 +513,27 @@ bool oscilation_judge1(vector<Node> &scc1,vector<string> &signals)
         }
     }
 
-    
-    //负反馈数量都是奇数才会起振
+    //写错了你妈的
+    //负反馈数量都是奇数肯定会起振
     if(non_num1%2==1&&non_num0%2==1)
     {
         cir_can_signals.push_back(wires0);
         cir_can_signals.push_back(wires1);
         return true;
     }
+
+    //没有奇数负反馈不会起振
+    else if(non_num1%2==0&&non_num0%2==0)
+    return false;
+
+    //只有一个环是奇数个负反馈
+    else 
+    {
+        return false;
+    }
     
-    else return false;
+    
+    return false;
 
 
 /*貌似是都没用
@@ -795,18 +812,23 @@ int main(int argc,char *argv[])
     
     for(int i=0;i<scc_vec.size();i++)
     {
-
-
-        for(int j=0;j<scc_vec[i].size();j++)
-        {
-            std::cout<<scc_vec[i][j].name<<endl;
-        }
-
         if(scc_vec[i].size()==1) continue;
         cir_count=0;
         johnson(scc_vec[i][0].id,scc_vec[i]);
     
-     
+
+
+        /*检查johnson()
+        for(int j=0;j<scc_vec[i].size();j++)
+        {
+            cout<<scc_vec[i][j].name<<".cir:";
+            for(int k=0;k<scc_vec[i][j].cir.size();k++)
+            cout<<scc_vec[i][j].cir[k]<<" ";
+            cout<<endl;
+        }*/
+
+
+
         //向结点添加输入端口
         for(int j=0;j<scc_vec[i].size();j++)
         {
