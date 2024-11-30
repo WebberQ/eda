@@ -387,22 +387,170 @@ void topo(int start,vector<Node> &scc1)
 
 }
 //判断双环起振
-bool oscilation_judge1(vector<Node> &scc1,vector<string> &signals)
+
+//condition放置函数
+void condition_placement(Node &node1,string &string1,vector<string> &conditions1,vector<string> &conditions0,vector<string> &conditions01)
+{
+    if(node1.cir.size()==2)
+    {
+        conditions01.push_back(string1);
+        conditions1.push_back(string1);
+        conditions0.push_back(string1);
+    }
+    else if(node1.cir[0]==0)
+    {
+        conditions01.push_back(string1);
+        conditions0.push_back(string1);
+    }
+    else if(node1.cir[0]==1)
+    {
+        conditions01.push_back(string1);
+        conditions1.push_back(string1);
+    }
+    return;
+
+}
+
+
+void condition_find(int value1,vector<string> &condition1,vector<vector<string>> &conditions,int id1,vector<Node> &scc1)
+{
+    //回退到了双环上，返回
+    if(scc1[scc_place_map[id1].second].cir.size()==2) return;
+
+    if(value1==1)//如果该处需要的值是1
+    {
+        if(scc1[scc_place_map[id1].second].gate_type==not11)
+        condition_find(0,condition1,conditions,scc1[scc_place_map[id1].second].input[0],scc1);
+        else if(scc1[scc_place_map[id1].second].gate_type==and2)
+        {
+            if(scc1[scc_place_map[id1].second].in_ports[0].in==1)
+            {
+                string signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[0].port)+"=1";
+                condition1.push_back(signal_temp);
+            }
+            else 
+            {
+                string signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[1].port)+"=1";
+                condition1.push_back(signal_temp);
+            }
+            condition_find(1,condition1,conditions,scc1[scc_place_map[id1].second].input[0],scc1);
+        }
+        else if(scc1[scc_place_map[id1].second].gate_type==or2)
+        {
+            if(scc1[scc_place_map[id1].second].in_ports[0].in==1)
+            {
+               string signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[0].port)+"=1";
+               condition1.push_back(signal_temp);
+               conditions.push_back(condition1);
+               signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[0].port)+"=0";
+               condition1[condition1.size()-1]=signal_temp;
+               condition_find(1,condition1,conditions,scc1[scc_place_map[id1].second].input[0],scc1); 
+            }
+            else 
+            {
+               string signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[1].port)+"=1";
+               condition1.push_back(signal_temp);
+               conditions.push_back(condition1);
+               signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[1].port)+"=0";
+               condition1[condition1.size()-1]=signal_temp;
+               condition_find(1,condition1,conditions,scc1[scc_place_map[id1].second].input[0],scc1); 
+            }
+        }
+        else if(scc1[scc_place_map[id1].second].gate_type==nand2)
+        {
+            if(scc1[scc_place_map[id1].second].in_ports[0].in==1)
+            {
+                string signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[0].port)+"=0";
+                condition1.push_back(signal_temp);
+                conditions.push_back(condition1);
+                signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[0].port)+"=1";
+                condition1[condition1.size()-1]=signal_temp;
+                condition_find(0,condition1,conditions,scc1[scc_place_map[id1].second].input[0],scc1);
+            }
+            else 
+            {
+                string signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[1].port)+"=0";
+                condition1.push_back(signal_temp);
+                conditions.push_back(condition1);
+                signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[1].port)+"=1";
+                condition1[condition1.size()-1]=signal_temp;
+                condition_find(0,condition1,conditions,scc1[scc_place_map[id1].second].input[0],scc1);
+            }
+        }
+    }
+    //如果此处需要的值是0
+    else 
+    {
+        if(scc1[scc_place_map[id1].second].gate_type==not11)
+        {
+            condition_find(1,condition1,conditions,scc1[scc_place_map[id1].second].input[0],scc1);
+        }
+        else if(scc1[scc_place_map[id1].second].gate_type==and2)
+        {
+            if(scc1[scc_place_map[id1].second].in_ports[0].in==1)
+            {
+                string signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[0].port)+"=0";
+                condition1.push_back(signal_temp);
+                conditions.push_back(condition1);
+                signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[0].port)+"=1";
+                condition1[condition1.size()-1]=signal_temp;
+                condition_find(0,condition1,conditions,scc1[scc_place_map[id1].second].input[0],scc1);
+            }
+            else 
+            {
+                string signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[1].port)+"=0";
+                condition1.push_back(signal_temp);
+                conditions.push_back(condition1);
+                signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[1].port)+"=1";
+                condition1[condition1.size()-1]=signal_temp;
+                condition_find(0,condition1,conditions,scc1[scc_place_map[id1].second].input[0],scc1);
+            }
+        }
+        else if(scc1[scc_place_map[id1].second].gate_type==or2)
+        {
+            string signal_temp;
+            if(scc1[scc_place_map[id1].second].in_ports[0].in==1)
+            {
+            signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[0].port)+"=0";
+            }
+            else signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[1].port)+"=0";
+            condition1.push_back(signal_temp);
+            condition_find(0,condition1,conditions,scc1[scc_place_map[id1].second].input[0],scc1);
+        }
+        else if(scc1[scc_place_map[id1].second].gate_type==nand2)
+        {
+            string signal_temp;
+            if(scc1[scc_place_map[id1].second].in_ports[0].in==1)
+            signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[0].port)+"=1";
+            else signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[1].port)+"=1";
+            condition1.push_back(signal_temp);
+            condition_find(1,condition1,conditions,scc1[scc_place_map[id1].second].input[0],scc1);
+        }
+    }
+
+    return;
+}
+
+
+
+bool oscilation_judge1(vector<Node> &scc1,vector<vector<string>> &conditions)
 {
 
     int non_num0=0;
     int non_num1=0;
-    int double_cir_start=-1;//记录双环共用的某个结点作为拓扑起点和终点
+    int double_cir_start=-1;//记录双环公用的输入结点
     vector<string> wires0;
     vector<string> wires1;
 
-
+    vector<string> conditions_temp1;//单独1环起振
+    vector<string> conditions_temp0;//单独0环起振
+    vector<string> conditions_temp01;//0和1环共同起振
     for(int i=0;i<scc1.size();i++)
     {
         Node &node1=scc1[i];
-        if(node1.cir.size()==2)
+        if(node1.cir.size()==2&&node1.input.size()==2)
         {
-            double_cir_start=i;
+            double_cir_start=node1.id;
         }
 
         if(node1.gate_type==not11)
@@ -434,7 +582,7 @@ bool oscilation_judge1(vector<Node> &scc1,vector<string> &signals)
                 {   
                     indeg_temp++;
                     string signal_temp=node1.name+".port"+to_string(node1.in_ports[j].port)+"=1";
-                    signals.push_back(signal_temp);
+                    condition_placement(node1,signal_temp,conditions_temp1,conditions_temp0,conditions_temp01);
                 }
 
             }
@@ -462,7 +610,7 @@ bool oscilation_judge1(vector<Node> &scc1,vector<string> &signals)
                 {
                     indeg_temp++;
                     string signal_temp=node1.name+".port"+to_string(node1.in_ports[j].port)+"=0";
-                    signals.push_back(signal_temp);
+                    condition_placement(node1,signal_temp,conditions_temp1,conditions_temp0,conditions_temp01);
                 }
             }
             node1.indeg=2-indeg_temp;
@@ -489,7 +637,7 @@ bool oscilation_judge1(vector<Node> &scc1,vector<string> &signals)
                 {
                     indeg_temp++;
                     string signal_temp=node1.name+".port"+to_string(node1.in_ports[j].port)+"=1";
-                    signals.push_back(signal_temp);
+                    condition_placement(node1,signal_temp,conditions_temp1,conditions_temp0,conditions_temp01);
                 }
             }
             node1.indeg=2-indeg_temp;
@@ -513,75 +661,85 @@ bool oscilation_judge1(vector<Node> &scc1,vector<string> &signals)
         }
     }
 
-    //写错了你妈的
-    //负反馈数量都是奇数肯定会起振
-    if(non_num1%2==1&&non_num0%2==1)
-    {
-        cir_can_signals.push_back(wires0);
-        cir_can_signals.push_back(wires1);
-        return true;
-    }
 
     //没有奇数负反馈不会起振
-    else if(non_num1%2==0&&non_num0%2==0)
+    if((non_num1%2==0&&non_num0%2==0)) 
     return false;
 
-    //只有一个环是奇数个负反馈
-    else 
-    {
-        return false;
-    }
-    
-    
-    return false;
-
-
-/*貌似是都没用
-    topo(double_cir_start,scc1);
-    
-
-    scc1[scc_place_map[topo_vec[0]].second].gate_value=x;
-    value value1;
-    for(int i=1;i<topo_vec.size();i++)
-    {
-        Node &node1=scc1[scc_place_map[topo_vec[i]].second];
-        if(node1.gate_type==not11)
-        {
-            node1.gate_value=NOT(scc1[scc_place_map[node1.input[0]].second].gate_value);
-        }
-        else if(node1.gate_type==and2)
-        {
-            if(node1.input.size()==2)
-            node1.gate_value=AND(scc1[scc_place_map[node1.input[0]].second].gate_value,scc1[scc_place_map[node1.input[1]].second].gate_value);
-            else node1.gate_value=scc1[scc_place_map[node1.input[0]].second].gate_value;
-        }
-        else if(node1.gate_type==or2)
-        {
-            if(node1.input.size()==2)
-            node1.gate_value=OR(scc1[scc_place_map[node1.input[0]].second].gate_value,scc1[scc_place_map[node1.input[1]].second].gate_value);
-            else node1.gate_value=scc1[scc_place_map[node1.input[0]].second].gate_value;
-        }
-        else if(node1.gate_type==nand2)
-        {
-            if(node1.input.size()==2)
-            node1.gate_value=NAND(scc1[scc_place_map[node1.input[0]].second].gate_value,scc1[scc_place_map[node1.input[1]].second].gate_value);
-            else node1.gate_value=NOT(scc1[scc_place_map[node1.input[0]].second].gate_value);
-        }
-
-        if(node1.gate_value==zero||node1.gate_value==one)
-        return false;
-        value1=node1.gate_value;
-    }
-
-    if(value1==x_prime)  
+    //负反馈数量都是奇数肯定会起振,但是要考虑多重震荡情况的存在
+    else if(non_num1%2==1&&non_num0%2==1)
     {
         cir_can_signals.push_back(wires0);
         cir_can_signals.push_back(wires1);
+        conditions.push_back(conditions_temp01);
+        
+
+        int start_value;
+        if(G[double_cir_start].gate_type==nand2||G[double_cir_start].gate_type==and2)
+        start_value=1;
+        else start_value=0;
+        
+
+        for(int i=0;i<conditions_temp0.size();i++)
+        cout<<conditions_temp0[i]<<endl;
+        cout<<endl;
+        for(int i=0;i<conditions_temp1.size();i++)
+        cout<<conditions_temp1[i]<<endl;
+        
+        for(int i=0;i<scc1[scc_place_map[double_cir_start].second].input.size();i++)
+        {
+            int v1=scc1[scc_place_map[double_cir_start].second].input[i];
+            cout<<scc1[scc_place_map[v1].second].name<<endl;
+            if(scc1[scc_place_map[v1].second].cir.size()==1&&scc1[scc_place_map[v1].second].cir[0]==1)
+            {
+                condition_find(start_value,conditions_temp0,conditions,v1,scc1);
+            }
+            else if(scc1[scc_place_map[v1].second].cir.size()==1&&scc1[scc_place_map[v1].second].cir[0]==0)
+            {
+                condition_find(start_value,conditions_temp1,conditions,v1,scc1);
+            }
+        }
+
         return true;
     }
 
-    else return false;
-    */
+    
+    else//有一个环是奇数个负反馈
+    {
+        int non_num;
+        if(non_num0%2==1)
+        non_num=0;
+        else non_num=1;
+
+        vector<string> condition_variable;
+        if(non_num==0) condition_variable=conditions_temp0;
+        else condition_variable=conditions_temp1;
+
+        int start_value;
+        if(G[double_cir_start].gate_type==nand2||G[double_cir_start].gate_type==and2)
+        start_value=1;
+        else start_value=0;
+        
+        for(int i=0;i<scc1[scc_place_map[double_cir_start].second].input.size();i++)
+        {
+            conditions.clear();
+            int v1=scc1[scc_place_map[double_cir_start].second].input[i];
+            if(scc1[scc_place_map[v1].second].cir.size()==1&&scc1[scc_place_map[v1].second].cir[0]!=non_num)
+            {
+                condition_find(start_value,condition_variable,conditions,v1,scc1);
+                if(conditions.size()!=0)
+                {
+                    if(non_num==0) cir_can_signals.push_back(wires0);
+                    else cir_can_signals.push_back(wires1);
+                    return true;
+                }
+            }
+        }
+        
+    }
+
+
+    return false;
 
 }
 
@@ -798,7 +956,7 @@ int main(int argc,char *argv[])
     vector<vector<string>> osc_cannt_gates;
     vector<vector<string>> osc_cannt_signals;
     vector<vector<string>> osc_can_gates;
-    vector<vector<string>> osc_can_conditions;
+    vector<vector<vector<string>>> osc_can_conditions;//由于震荡可能有多重情况，用三维数组存储
     vector<vector<string>> osc_can_signals;
 
     for(int i=0;i<vis.size();i++)
@@ -818,7 +976,7 @@ int main(int argc,char *argv[])
     
 
 
-        /*检查johnson()
+        /*//检查johnson()
         for(int j=0;j<scc_vec[i].size();j++)
         {
             cout<<scc_vec[i][j].name<<".cir:";
@@ -856,7 +1014,9 @@ int main(int argc,char *argv[])
             if(oscilation_judge0(scc_vec[i],signals_temp))//如果能振荡
             {
                 sort(signals_temp.begin(),signals_temp.end());
-                osc_can_conditions.push_back(signals_temp);
+                vector<vector<string>> condition_temp;
+                condition_temp.push_back(signals_temp);
+                osc_can_conditions.push_back(condition_temp);
                 osc_can_gates.push_back(G_scc[i].gates);
                 osc_can_signals.push_back(G_scc[i].signals);
                 cir_can_signals.push_back(G_scc[i].signals);
@@ -870,13 +1030,19 @@ int main(int argc,char *argv[])
 
         else if(cir_count==2)
         {
-            vector<string> signals_temp;
-            if(oscilation_judge1(scc_vec[i],signals_temp))
+            vector<vector<string>> condition_temp;
+            if(oscilation_judge1(scc_vec[i],condition_temp))
             {
-             sort(signals_temp.begin(),signals_temp.end());
-             osc_can_conditions.push_back(signals_temp);
-             osc_can_gates.push_back(G_scc[i].gates);
-             osc_can_signals.push_back(G_scc[i].signals);
+
+
+            for(int j=0;j<condition_temp.size();j++)
+            sort(condition_temp[j].begin(),condition_temp[j].end());
+            osc_can_conditions.push_back(condition_temp);
+            
+         
+
+            osc_can_gates.push_back(G_scc[i].gates);
+            osc_can_signals.push_back(G_scc[i].signals);
             }
             else
             {
@@ -955,13 +1121,16 @@ int main(int argc,char *argv[])
             }
             for(int j=0;j<osc_can_conditions[i].size();j++)
             {
-                if(j==0)
+                for(int k=0;k<osc_can_conditions[i][j].size();k++)
                 {
-                outputFile3<<endl<<"Loop Condition:"<<osc_can_conditions[i][j];
+                if(k==0)
+                {
+                outputFile3<<endl<<"Loop Condition:"<<osc_can_conditions[i][j][k];
                 }
                 else
                 {
-                outputFile3<<","<<osc_can_conditions[i][j];
+                outputFile3<<","<<osc_can_conditions[i][j][k];
+                }
                 }
             }        
             }
