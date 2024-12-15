@@ -10,6 +10,7 @@
 #include<algorithm>
 #include<cmath>
 #include<chrono>
+#include<unordered_set>
 using namespace std;
 
 
@@ -32,47 +33,6 @@ enum value
     x_prime
 };
 
-value NOT(value value1)
-{
-    if(value1==zero) return one;
-    else if(value1==one) return zero;
-    else if(value1==x) return x_prime;
-    else if(value1==x_prime) return x;
-    return one;
-}
-
-value AND(value b,value a)
-{
-    if(a==0||b==0) return zero;
-    else if(a==1) return b;
-    else if(b==1) return a;
-    else if(a==b) return a;
-    else if(a!=b) return zero;
-    else return one;
-}
-
-
-value OR(value a,value b)
-{
-    if(a==1||b==1) return one;
-    else if(a==0) return b;
-    else if(b==0) return a;
-
-    else if(a==b) return a;
-    else if(a!=b) return one;
-    return one;
-}
-
-value NAND(value b,value a)
-{
-    if(a==0||b==0) return one;
-    else if(a==1) return NOT(b);
-    else if(b==1) return NOT(a);
-    
-    else if(a==b) return NOT(a);
-    else if(a!=b) return one;
-    return one;
-}
 
 
 //存储端口名称，包括结点名和端口名
@@ -420,7 +380,14 @@ void condition_find(int value1,vector<string> &condition1,vector<vector<string>>
     if(value1==1)//如果该处需要的值是1
     {
         if(scc1[scc_place_map[id1].second].gate_type==not11)
+        {
+        if(scc1[scc_place_map[id1].second].input.size()!=0)
         condition_find(0,condition1,conditions,scc1[scc_place_map[id1].second].input[0],scc1);
+        else 
+        {string signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[0].port)+"=0";
+        condition1.push_back(signal_temp);
+        }
+        }
         else if(scc1[scc_place_map[id1].second].gate_type==and2)
         {
             if(scc1[scc_place_map[id1].second].in_ports[0].in==1)
@@ -483,7 +450,13 @@ void condition_find(int value1,vector<string> &condition1,vector<vector<string>>
     {
         if(scc1[scc_place_map[id1].second].gate_type==not11)
         {
+            if(scc1[scc_place_map[id1].second].input.size()!=0)
             condition_find(1,condition1,conditions,scc1[scc_place_map[id1].second].input[0],scc1);
+            else 
+            {
+                string signal_temp=scc1[scc_place_map[id1].second].name+".port"+to_string(scc1[scc_place_map[id1].second].in_ports[0].port)+"=1";
+                condition1.push_back(signal_temp);
+            }
         }
         else if(scc1[scc_place_map[id1].second].gate_type==and2)
         {
@@ -681,15 +654,14 @@ bool oscilation_judge1(vector<Node> &scc1,vector<vector<string>> &conditions)
         
 
         for(int i=0;i<conditions_temp0.size();i++)
-        cout<<conditions_temp0[i]<<endl;
-        cout<<endl;
+
         for(int i=0;i<conditions_temp1.size();i++)
-        cout<<conditions_temp1[i]<<endl;
+
         
         for(int i=0;i<scc1[scc_place_map[double_cir_start].second].input.size();i++)
         {
             int v1=scc1[scc_place_map[double_cir_start].second].input[i];
-            cout<<scc1[scc_place_map[v1].second].name<<endl;
+          
             if(scc1[scc_place_map[v1].second].cir.size()==1&&scc1[scc_place_map[v1].second].cir[0]==1)
             {
                 condition_find(start_value,conditions_temp0,conditions,v1,scc1);
@@ -742,6 +714,447 @@ bool oscilation_judge1(vector<Node> &scc1,vector<vector<string>> &conditions)
     return false;
 
 }
+
+
+
+bool condition_find_for_3loop(vector<Node> &scc1,int id,value value1,int non,vector<string> &condition_temp)
+{
+    Node& node1=scc1[scc_place_map[id].second];
+    //该点已经被搜索过
+    if(node1.gate_value!=x)
+    {
+        if(node1.gate_value==value1)
+        {
+            return true;
+        }
+        else return false;
+    }
+
+
+    //该点返回到了目标环
+    for(int i=0;i<node1.cir.size();i++)
+    {
+        if(node1.cir[i]==non)
+        return false;
+    }
+
+
+    node1.gate_value=value1;
+
+    //如果此处需要的值是0
+    if(value1==zero)
+    {
+
+        //not1
+        if(node1.gate_type==not11)
+        {
+            //为输入端口
+            if(node1.input.size()==0)
+            {
+                string signal_temp=node1.name+".port"+to_string(node1.in_ports[0].port)+"=1";
+                condition_temp.push_back(signal_temp);
+                return true;
+            }
+            //不是输入端口
+            else 
+            {
+                if(condition_find_for_3loop(scc1,node1.input[0],one,non,condition_temp))
+                return true;
+            }
+        }
+
+        //and2
+        else if(node1.gate_type==and2)
+        {
+
+            //and2有一个输入在scc里面
+            if(node1.input.size()==1)
+            {
+                int port_num;
+                if(node1.in_ports[0].in==1)
+                {
+                 port_num=node1.in_ports[0].port;   
+                }
+                else port_num=node1.in_ports[1].port;
+
+
+                string signal_temp=node1.name+".port"+to_string(port_num)+"=0";
+                condition_temp.push_back(signal_temp);
+                return true;
+            }
+            //and2有两个输入在scc里面
+            else
+            {
+                //贪心找输入条件
+                bool flag=condition_find_for_3loop(scc1,node1.input[0],zero,non,condition_temp)||condition_find_for_3loop(scc1,node1.input[1],zero,non,condition_temp);
+                if(flag)
+                return true;
+            }
+        }
+
+        //or2
+        else if(node1.gate_type==or2)
+        {
+            //or2有一个输入在scc里面
+            if(node1.input.size()==1)
+            {
+                int port_num;
+                if(node1.in_ports[0].in==1)
+                {
+                    port_num=node1.in_ports[0].port;
+                }
+                else port_num=node1.in_ports[1].port;
+
+                if(condition_find_for_3loop(scc1,node1.input[0],zero,non,condition_temp))
+                {
+                string signal_temp=node1.name+".port"+to_string(port_num)+"=0";
+                condition_temp.push_back(signal_temp);
+                return true;
+                }
+            }
+
+            //or2有两个输入在scc里面
+            else
+            {
+                //贪心，先找到第一个输入的固定条件，再找到第二个输入的固定条件
+                bool flag=condition_find_for_3loop(scc1,node1.input[0],zero,non,condition_temp)&&condition_find_for_3loop(scc1,node1.input[1],zero,non,condition_temp);
+                if(flag)
+                return true;
+            }
+        }
+
+
+        //nand2
+        else if(node1.gate_type==nand2)
+        {
+            //nand2只有一个输入在scc里面
+            if(node1.input.size()==1)
+            {
+                int port_num;
+                if(node1.in_ports[0].in==1)
+                {
+                    port_num=node1.in_ports[0].port;
+                }
+
+                else
+                port_num=node1.in_ports[1].port;
+                
+                if(condition_find_for_3loop(scc1,node1.input[0],one,non,condition_temp))
+                {
+                    
+                string signal_temp=node1.name+".port"+to_string(port_num)+"=1";
+                condition_temp.push_back(signal_temp);
+                return true;
+                }       
+            }
+            //nand2有两个输入在scc里面
+            else 
+            {
+                //贪心，先找一个输入端口的固定条件，再找另一个输入端口的固定条件
+                bool flag=condition_find_for_3loop(scc1,node1.input[0],one,non,condition_temp)&&condition_find_for_3loop(scc1,node1.input[1],one,non,condition_temp);
+
+            }
+        }
+
+
+
+    }
+
+
+    //如果此处需要的值是1
+    else
+    {
+        //not1
+        if(node1.gate_type==not11)
+        {
+            if(condition_find_for_3loop(scc1,node1.input[0],zero,non,condition_temp))
+            return true;
+        }
+
+        //and2
+        else if(node1.gate_type==and2)
+        {
+            //and2有一个输入在scc里面
+            if(node1.input.size()==1)
+            {
+                int port_num;
+                if(node1.in_ports[0].in==1)
+                {
+                    port_num=node1.in_ports[0].port;
+                }
+                else port_num=node1.in_ports[1].port;
+
+                if(condition_find_for_3loop(scc1,node1.input[0],one,non,condition_temp))
+                {
+                    string signal_temp=node1.name+".port"+to_string(port_num)+"=1";
+                    condition_temp.push_back(signal_temp);
+                    return true;
+                }
+            }
+
+            else
+            {
+                bool flag=condition_find_for_3loop(scc1,node1.input[0],one,non,condition_temp)&&condition_find_for_3loop(scc1,node1.input[1],one,non,condition_temp);
+                if(flag)
+                return true;
+            }
+        }
+
+        //or2
+        else if(node1.gate_type==or2)
+        {
+            //or2有一个输入在scc里面
+            if(node1.input.size()==1)
+            {
+                int port_num;
+                if(node1.in_ports[0].in==1)
+                {
+                    port_num=node1.in_ports[0].port;
+                }
+                else port_num=node1.in_ports[1].port;
+
+                string signal_temp=node1.name+".port"+to_string(port_num)+"=1";
+                condition_temp.push_back(signal_temp);
+                return true;
+            }
+
+
+            //or2有两个输入在一个scc里面
+            else 
+            {
+                bool flag=condition_find_for_3loop(scc1,node1.input[0],one,non,condition_temp)||condition_find_for_3loop(scc1,node1.input[1],one,non,condition_temp);
+                if(flag) 
+                return true;
+            }
+        }
+
+
+        //nand2
+        else if(node1.gate_type==nand2)
+        {
+            //nand2只有一个输入在scc里面
+            if(node1.input.size()==1)
+            {
+                int port_num;
+                if(node1.in_ports[0].in==1)
+                {
+                    port_num=node1.in_ports[0].port;
+                }
+                else port_num=node1.in_ports[1].port;
+
+                string signal_temp=node1.name+".port"+to_string(port_num)+"=0";
+                condition_temp.push_back(signal_temp);
+                return true;
+            }
+
+            //nand2有两个输入在scc里面
+            else
+            {
+                bool flag=condition_find_for_3loop(scc1,node1.input[0],zero,non,condition_temp)||condition_find_for_3loop(scc1,node1.input[1],zero,non,condition_temp);
+                if(flag)
+                return true;
+            }
+
+        }
+    }
+
+
+    //回溯
+    node1.gate_value=x;
+    return false;
+    
+
+
+}
+
+bool oscilation_judge2(vector<Node> &scc1,vector<vector<string>> &conditions)
+{
+
+    //存储奇数负反馈的个数
+    int non_num[3]={0};
+
+    //存储每个环的端口条件
+    vector<vector<string>> condition_temp;
+    //存储交叉点
+    vector<vector<int>> cir_junction_point;
+    for(int i=0;i<3;i++)
+    {
+        cir_junction_point.push_back(vector<int>());
+    }
+
+
+    for(int i=0;i<3;i++)
+    {
+        condition_temp.push_back(vector<string>());
+    }
+
+
+    for(int i=0;i<scc1.size();i++)
+    {
+
+        //not1
+        if(scc1[i].gate_type==not11)
+        {
+            for(int j=0;j<scc1[i].cir.size();j++)
+            {
+                non_num[scc1[i].cir[j]]++;
+            }
+        }
+
+
+        //and2
+        else if(scc1[i].gate_type==and2)
+        {
+            for(int j=0;j<scc1[i].in_ports.size();j++)
+            {
+                if(scc1[i].in_ports[j].in==1)
+                {
+                    string condition1=scc1[i].name+".port"+to_string(scc1[i].in_ports[j].port)+"=1";
+                    for(int k=0;k<scc1[i].cir.size();k++)
+                    {
+                        condition_temp[scc1[i].cir[k]].push_back(condition1);
+                    }
+                }
+            }
+
+            //and2是环的交界输入点
+            if(scc1[i].input.size()==2)
+            {
+                for(int j=0;j<scc1[i].cir.size();j++)
+                {
+                    cir_junction_point[scc1[i].cir[j]].push_back(scc1[i].id);
+                }
+            }
+        }
+
+        //or2
+        else if(scc1[i].gate_type==or2)
+        {
+            for(int j=0;j<scc1[i].in_ports.size();j++)
+            {
+                if(scc1[i].in_ports[j].in==1)
+                {
+                    string condition1=scc1[i].name+".port"+to_string(scc1[i].in_ports[j].port)+"=0";
+                    for(int k=0;k<scc1[i].cir.size();k++)
+                    {
+                        condition_temp[scc1[i].cir[k]].push_back(condition1);
+                    }
+                }
+            }
+
+
+            //or2是环的交界输入点
+            if(scc1[i].input.size()==2)
+            {
+                for(int j=0;j<scc1[i].cir.size();j++)
+                {
+                    cir_junction_point[scc1[i].cir[j]].push_back(scc1[i].id);
+                }
+            }
+        }
+
+        else if(scc1[i].gate_type==nand2)
+        {
+            vector<string> condition_temp1;
+            for(int j=0;j<scc1[i].in_ports.size();j++)
+            {
+                if(scc1[i].in_ports[j].in==1)
+                {
+                    condition_temp1.push_back(scc1[i].name+".port"+to_string(scc1[i].in_ports[j].port)+"=1");
+                }
+            }
+
+            for(int j=0;j<scc1[i].cir.size();j++)
+            {
+                non_num[scc1[i].cir[j]]++;
+                for(int k=0;k<condition_temp1.size();k++)
+                {
+                    condition_temp[scc1[i].cir[j]].push_back(condition_temp1[k]);
+                }
+            }
+
+
+            //nand2是环的交界输入点
+            if(scc1[i].input.size()==2)
+            {
+                for(int j=0;j<scc1[i].cir.size();j++)
+                {
+                    cir_junction_point[scc1[i].cir[j]].push_back(scc1[i].id);
+                }
+            }
+        }
+    }
+
+    //三个负反馈环，肯定会起振
+    if(non_num[0]%2==1&&non_num[1]%2==1&&non_num[2]%2==1)
+    {
+        unordered_set<string> uniqueSet;
+        uniqueSet.insert(condition_temp[0].begin(),condition_temp[0].end());
+        uniqueSet.insert(condition_temp[1].begin(),condition_temp[1].end());
+        uniqueSet.insert(condition_temp[2].begin(),condition_temp[2].end());
+
+        conditions.push_back(vector<string>(uniqueSet.begin(),uniqueSet.end()));
+
+        return true;
+    }
+
+
+    //没有可以振荡的环
+    else if(non_num[0]%2==0&&non_num[1]%2==0&&non_num[2]%2==0)
+    return false;
+
+
+    //只有一个环是负反馈环
+    else if(int(non_num[0]%2==1)+int(non_num[1]%2==1)+int(non_num[2]%2==1)==1)
+    {
+        int non;
+        if(non_num[0]%2==1) non=0;
+        else if(non_num[1]%2==1) non=1;
+        else non=2;
+
+        bool flag1=true;
+        for(int i=0;i<cir_junction_point[non].size();i++)
+        {
+            int id=cir_junction_point[non][i];
+            Node &node1=scc1[scc_place_map[id].second];
+            
+            value value1;
+            if(node1.gate_type==and2||node1.gate_type==nand2) value1=one;
+            else value1=zero;
+
+            for(int i=0;i<node1.input.size();i++)
+            {
+                auto it=find(scc1[scc_place_map[node1.input[i]].second].cir.begin(),scc1[scc_place_map[node1.input[i]].second].cir.end(),non);
+                
+                //该处的输入端不在本次搜索的环里面
+                if(it==scc1[scc_place_map[node1.input[i]].second].cir.end())
+                {
+                    flag1=condition_find_for_3loop(scc1,node1.input[i],value1,non,condition_temp[non]);
+                }
+
+                if(!flag1) 
+                break;
+            }
+
+            if(!flag1) break;
+        }
+
+
+        if(flag1)
+        {
+            conditions.push_back(condition_temp[non]);
+
+            return true;
+        }
+
+
+    }
+
+    
+
+    return false;
+}
+
 
 int main(int argc,char *argv[])
 {
@@ -950,6 +1363,9 @@ int main(int argc,char *argv[])
     }
 
     outputFile.close();
+    G.clear();
+    HE.clear();
+
 
     //开始第二问
     auto start2=std::chrono::high_resolution_clock::now();
@@ -991,6 +1407,7 @@ int main(int argc,char *argv[])
         for(int j=0;j<scc_vec[i].size();j++)
         {
             Node& node1=scc_vec[i][j];
+            node1.gate_value=x;
             if(node1.gate_type==not11) continue;// not不可能有额外的输入端口
             else
             {
@@ -1050,7 +1467,27 @@ int main(int argc,char *argv[])
                 osc_cannt_signals.push_back(G_scc[i].signals);
             }
         }
-        
+
+        else if(cir_count==3)
+        {
+            vector<vector<string>> condition_temp;
+            if(oscilation_judge2(scc_vec[i],condition_temp))
+            {
+                for(int j=0;j<condition_temp.size();j++)
+                sort(condition_temp[j].begin(),condition_temp[j].end());
+                osc_can_conditions.push_back(condition_temp);
+
+                osc_can_gates.push_back(G_scc[i].gates);
+                osc_can_signals.push_back(G_scc[i].signals);
+            }
+
+            else 
+            {
+                osc_cannt_gates.push_back(G_scc[i].gates);
+                osc_cannt_signals.push_back(G_scc[i].signals);
+            }
+        }
+
     }
 
     ofstream outputFile2("result_2.txt");
@@ -1082,6 +1519,7 @@ int main(int argc,char *argv[])
                 outputFile2<<","<<osc_cannt_gates[i][j];
                 }
             }
+            outputFile2<<endl;
         }
     }
     else {
@@ -1132,7 +1570,8 @@ int main(int argc,char *argv[])
                 outputFile3<<","<<osc_can_conditions[i][j][k];
                 }
                 }
-            }        
+            }    
+            outputFile3<<endl;    
             }
     }
     else {
