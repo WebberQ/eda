@@ -1,0 +1,15 @@
+module name is combLogic
+0  : not1   a   w1   w2 
+1  : nand2  b   w2   w3   w4
+2  : and2   c   w4   w5   w6
+3  : nand2  d   w6   w7   w8
+4  : or2    e   w7   w9   w10
+5  : and2   f   w9   w1   w11
+6  : not1   g   w12  w1
+7  : or2    h   w14  w13  w12
+8  : not1   i   w15  w14
+9  : or2    j   w18  w16  w15
+10 : and2   k   w21  w17  w18
+11 : or2    l   w23  w22  w21
+12 : nand2  n   w20  w18  w24
+13 : and2   o   w5   w20  w23
