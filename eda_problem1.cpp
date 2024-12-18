@@ -967,6 +967,21 @@ bool condition_find_for_3loop(vector<Node> &scc1,int id,value value1,int non,vec
 
 }
 
+
+bool condition_find_for_3loop_2(vector<Node> &scc1,int id,value value1,vector<int> non,vector<string>  &condition_temp)
+{
+    Node &node1=scc1[id];
+    
+    //如果已经退回到两个环上
+    for(int i=0;i<node1.cir.size();i++)
+    {
+        if(node1.cir[i]==non[0]||node1.cir[i]==non[1])
+        return false;
+    }
+
+    //否则调用
+    return condition_find_for_3loop(scc1,id,value1,non[0],condition_temp);
+}
 bool oscilation_judge2(vector<Node> &scc1,vector<vector<string>> &conditions)
 {
 
@@ -1122,14 +1137,14 @@ bool oscilation_judge2(vector<Node> &scc1,vector<vector<string>> &conditions)
             if(node1.gate_type==and2||node1.gate_type==nand2) value1=one;
             else value1=zero;
 
-            for(int i=0;i<node1.input.size();i++)
+            for(int j=0;j<node1.input.size();j++)
             {
-                auto it=find(scc1[scc_place_map[node1.input[i]].second].cir.begin(),scc1[scc_place_map[node1.input[i]].second].cir.end(),non);
+                auto it=find(scc1[scc_place_map[node1.input[j]].second].cir.begin(),scc1[scc_place_map[node1.input[j]].second].cir.end(),non);
                 
                 //该处的输入端不在本次搜索的环里面
-                if(it==scc1[scc_place_map[node1.input[i]].second].cir.end())
+                if(it==scc1[scc_place_map[node1.input[j]].second].cir.end())
                 {
-                    flag1=condition_find_for_3loop(scc1,node1.input[i],value1,non,condition_temp[non]);
+                    flag1=condition_find_for_3loop(scc1,node1.input[j],value1,non,condition_temp[non]);
                 }
 
                 if(!flag1) 
@@ -1146,6 +1161,133 @@ bool oscilation_judge2(vector<Node> &scc1,vector<vector<string>> &conditions)
 
             return true;
         }
+
+
+    }
+    
+
+    
+    else
+    {
+
+        //首先判断出奇数个负反馈是哪两个双环
+        vector<int> non;
+        for(int i=0;i<3;i++)
+        {
+            if(non_num[i]%2==1) 
+            non.push_back(i);
+        }
+
+
+        //先考虑两个环能不能同时起振？
+
+
+        //整合两个的条件
+        unordered_set<string> uniqueSet_string;
+        for(int i=0;i<non.size();i++)
+        {
+            for(int j=0;j<condition_temp[non[i]].size();j++)
+            {
+                uniqueSet_string.insert(condition_temp[non[i]][j]);
+            }
+        }
+
+        vector<string> condition_temp_two(uniqueSet_string.begin(),uniqueSet_string.end());
+
+
+        //整合两个point
+        unordered_set<int> uniqueSet_int;
+        for(int i=0;i<non.size();i++)
+        {
+            for(int j=0;j<cir_junction_point[non[i]].size();j++)
+            {
+                uniqueSet_int.insert(cir_junction_point[non[i]][j]);
+            }
+        }
+        vector<int> cir_junction_points(uniqueSet_int.begin(),uniqueSet_int.end());
+        
+
+        bool flag_double=true;
+        //对于所有交叉点
+        for(int i=0;i<cir_junction_points.size();i++)
+        {
+            Node &node1=scc1[scc_place_map[cir_junction_points[i]].second];
+            value value1;
+            if(node1.gate_type==and2||node1.gate_type==nand2)
+            {
+                value1=one;
+            }
+            else value1=zero;
+
+
+            //交叉点的输入端
+            for(int j=0;j<node1.input.size();j++)
+            {
+                auto it2=find(scc1[scc_place_map[node1.input[j]].second].cir.begin(),scc1[scc_place_map[node1.input[j]].second].cir.end(),non[1]);
+                auto it1=find(scc1[scc_place_map[node1.input[j]].second].cir.begin(),scc1[scc_place_map[node1.input[j]].second].cir.end(),non[0]);
+                
+
+                //输入结点不在这两个振荡的scc里面
+                if(it1==scc1[scc_place_map[node1.input[j]].second].cir.end()&&it2==scc1[scc_place_map[node1.input[j]].second].cir.end())
+                {
+                    flag_double=condition_find_for_3loop_2(scc1,node1.input[j],value1,non,condition_temp_two);
+
+                    if(!flag_double) break;
+                }
+                 
+                if(!flag_double) break;
+            
+            }
+
+        }
+
+        if(flag_double)
+        {
+            conditions.push_back(condition_temp_two);
+            return true;
+        }
+
+      
+
+        //如果两个环不能同时起振，则考虑两个环分别起振
+        bool flag=true;
+        for(int i=0;i<non.size();i++)
+        {
+            int non_temp=non[i];
+            for(int j=0;j<cir_junction_point[non_temp].size();j++)
+            {
+                Node &node1=scc1[scc_place_map[cir_junction_point[non_temp][j]].second];
+
+                value value1;
+                if(node1.gate_type==and2||node1.gate_type==nand2) value1=one;
+                else value1=zero;
+
+                for(int k=0;k<node1.input.size();k++)
+                {
+                    auto it=find(scc1[scc_place_map[node1.input[k]].second].cir.begin(),scc1[scc_place_map[node1.input[k]].second].cir.end(),non_temp);
+
+                    if(it==scc1[scc_place_map[node1.input[k]].second].cir.end())
+                    {
+                        flag=condition_find_for_3loop(scc1,node1.input[k],value1,non_temp,condition_temp[non_temp]);
+
+                        if(!flag) break;
+                    }
+                }
+
+                if(!flag) break;
+            }
+
+            if(flag)
+            {
+                conditions.push_back(condition_temp[non_temp]);
+                return true;
+            }
+
+            flag=true;
+            
+            
+        }
+
 
 
     }
