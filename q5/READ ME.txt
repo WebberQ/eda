@@ -1,0 +1,3 @@
+Q5_testcase.v为赛题五提供的verilog测试用例
+result_5.v为改造后的测试用例
+result_5.pdf为附加pdf文档说明改造方法及原理
