@@ -1238,12 +1238,12 @@ bool oscilation_judge2(vector<Node> &scc1,vector<vector<string>> &conditions)
             }
         }
         vector<int> cir_junction_points(uniqueSet_int.begin(),uniqueSet_int.end());
-        
+        /*
         for(int j=0;j<cir_junction_points.size();j++)
         {
             cout<<scc1[scc_place_map[cir_junction_points[j]].second].name<<" ";
         }
-        cout<<endl;
+        cout<<endl;*/
 
         bool flag_double=true;
         //对于所有交叉点
@@ -1285,9 +1285,9 @@ bool oscilation_judge2(vector<Node> &scc1,vector<vector<string>> &conditions)
             conditions.push_back(condition_temp_two);
             return true;
         }
-
+        /*     
         cout<<"here!"<<endl;
-
+*/
         //如果两个环不能同时起振，则考虑两个环分别起振
         bool flag=true;
         for(int i=0;i<non.size();i++)
@@ -1434,6 +1434,10 @@ int main(int argc,char *argv[])
 
     }
 
+    auto stop1=std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration11 = stop1 - start;
+    cout<<"Reading time: "<<duration11.count()<<"s"<<endl;
+
     for(int i=0;i<gate_num;i++)
     {
         vis.push_back(0);
@@ -1534,6 +1538,7 @@ int main(int argc,char *argv[])
     /*第一题用时*/
     auto end1=std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration1 = end1 - start;
+    cout<<"tarjan time:"<<duration1.count()-duration11.count()<<"s"<<endl;
     cout<<"Time taken of Problem1: " << duration1.count() << " seconds" << endl;
 
     }
