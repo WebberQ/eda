@@ -29,6 +29,21 @@ eda_problem.cpp编译好后，在命令行中输入
 
 其中<test.txt>为测试样例路径，格式与文件夹之中test.txt相同即可
 
+## 测试文件格式
+
+module name is combLogic
+
+0 : gate1 output1 input11 input12
+
+1 : gate2 output2 input21 input22
+
+2 : gate3 output3 input31 input32
+
+……
+
+其中，gate为逻辑门名称，output为门输出信号线名称，input为门输入信号线名称（非门只有一个输入）
+
+
 ## 输出
 
 - result1.txt至result4.txt为一至四题对应的输出
